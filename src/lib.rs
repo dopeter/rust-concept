@@ -1,0 +1,1 @@
+pub mod thread_shared_obj;
