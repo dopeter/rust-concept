@@ -56,6 +56,7 @@ pub fn transfer_owner(mut struct_test:OwnerTest){
 
 pub fn transfer_owner_of_ref(mut struct_test:OwnerTestOfRef){
     struct_test.str_1= "in transfer func scope".to_string();
+
     struct_test.num_1=33;
     println!("{:#?}",struct_test);
 }
