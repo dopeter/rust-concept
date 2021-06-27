@@ -1,4 +1,5 @@
 use crate::thread_shared_obj::shared_obj::*;
+use std::time::Duration;
 
 
 pub fn test_thread_share() {
@@ -89,6 +90,29 @@ pub fn test_uncopiable_struct(){
     println!("{:?} : {:#?}", std::thread::current().id(), st);
 }
 
+pub fn test_send_obj(){
+
+    let (tx,rx)= std::sync::mpsc::channel();
+
+    std::thread::spawn(move || {
+        let vals = vec![String::from("hi"),String::from("from")];
+
+        for val in vals{
+            tx.send(val).unwrap();
+            std::thread::sleep(Duration::from_secs(1));
+        }
+
+        // println!("Inner of thread , {}",vals.len());
+
+
+    });
+
+    for received in rx{
+        println!("Got {}",received)
+    }
+
+}
+
 #[cfg(test)]
 mod tests {
     use crate::thread_shared_obj::thread_test::*;
@@ -111,5 +135,10 @@ mod tests {
     #[test]
     fn t_test_uncopiable_struct(){
         test_uncopiable_struct();
+    }
+
+    #[test]
+    fn t_test_send_obj(){
+        test_send_obj();
     }
 }
