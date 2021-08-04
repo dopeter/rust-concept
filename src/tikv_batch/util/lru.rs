@@ -3,6 +3,7 @@ use std::mem::MaybeUninit;
 use std::ptr;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::collections::hash_map::Entry as HashMapEntry;
 
 struct Record<K> {
     prev: NonNull<Record<K>>,
@@ -245,11 +246,121 @@ impl<K, V> LruCache<K, V>
 impl<K, V, T> LruCache<K, V, T>
     where K: Eq + Hash + Clone + std::fmt::Debug,
           T: SizePolicy<K, V> {
+    #[inline]
+    pub fn insert(&mut self, key: K, value: V) {
+        let mut old_key = None;
+        let current_size = SizePolicy::<K, V>::current(&self.size_policy);
+        match self.map.entry(key) {
+            HashMapEntry::Occupied(mut e) => {
+                self.size_policy.on_remove(e.key(), &e.get().value);
+                self.size_policy.on_insert(e.key(), &value);
+                let mut entry = e.get_mut();
+                self.trace.promote(entry.record);
+                entry.value = value;
+            }
+            HashMapEntry::Vacant(v) => {
+                let record = if self.capacity <= current_size {
+                    let res = self.trace.reuse_tail(v.key().clone());
+                    old_key = Some(res.0);
+                    res.1
+                } else {
+                    self.trace.create(v.key().clone())
+                };
+
+                self.size_policy.on_insert(v.key(), &value);
+                v.insert(ValueEntry { value, record });
+            }
+        }
+
+        if let Some(o) = old_key {
+            let entry = self.map.remove(&o).unwrap();
+            self.size_policy.on_remove(&o, &entry.value);
+        }
+    }
 
     #[inline]
-    pub fn insert(&mut self,key:K,value:V){
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        if let Some(v) = self.map.remove(key) {
+            self.trace.delete(v.record);
+            self.size_policy.on_remove(key, &v.value);
+            Some(v.value)
+        }
+        None
+    }
+
+    #[inline]
+    pub fn get(&mut self, key: &K) -> Option<&V> {
+        match self.map.get_mut(key) {
+            Some(v) => {
+                self.trace.maybe_promote(v.record);
+                Some(&v.value)
+            }
+            None => None
+        }
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut K> {
+        match self.map.get_mut(key) {
+            Some(v) => {
+                self.trace.maybe_promote(v.record);
+                Some(&mut v.value)
+            }
+            None => None
+        }
+    }
+
+    pub fn iter(&self) -> Iter<K, V> {
+        Iter {
+            base: self.map.iter()
+        }
+    }
+
+    pub fn len(&self) -> usize { self.map.len() }
+
+    pub fn is_empty(&self) -> bool { self.map.is_empty() }
+}
+
+unsafe impl<K, V, T> Send for LruCache<K, V, T>
+    where K: Send, V: Send, T: Send + SizePolicy<K, V>
+{}
+
+impl<K,V,T> Drop for LruCache<K,V,T>
+where T:SizePolicy<K,V>{
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+
+pub struct Iter<'a, K: 'a, V: 'a> {
+    base: std::collections::hash_map::Iter<'a, K, ValueEntry<K, V>>,
+}
+
+impl<'a,K,V> Iterator for Iter<'a,K,V>{
+    type Item = (&'a K,&'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.base.next().map(|(k,v)|(k,&v.value))
+    }
+}
+
+#[cfg!(test)]
+mod tests{
+
+    use super::*;
+
+    #[test]
+    fn test_insert(){
+        let mut map=LruCache::with_capacity(10);
+        for i in 0..10{
+            map.insert(i,i);
+        }
 
     }
 
 }
+
+
+
 
