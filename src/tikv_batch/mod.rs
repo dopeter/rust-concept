@@ -4,3 +4,4 @@ pub mod mailbox;
 pub mod mpsc;
 pub mod router;
 pub mod util;
+pub mod config;
