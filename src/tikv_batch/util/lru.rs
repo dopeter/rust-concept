@@ -211,7 +211,7 @@ impl<K, V, T> LruCache<K, V, T>
     }
 
     #[inline]
-    pub fn capacity(&self) -> usize { self.capacity() }
+    pub fn capacity(&self) -> usize { self.capacity }
 }
 
 impl<K, V> LruCache<K, V>
