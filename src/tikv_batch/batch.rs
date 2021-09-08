@@ -10,8 +10,9 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{self, SendError};
 use crate::tikv_batch::util;
 use std::thread;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicUsize;
+use std::collections::HashMap;
 
 enum FsmTypes<N, C> {
     Normal(Box<N>),
@@ -20,14 +21,7 @@ enum FsmTypes<N, C> {
     Empty,
 }
 
-/// Makes a thread name with an additional tag inherited from the current thread.
-macro_rules! thd_name {
-    ($name:expr) => {{
-        $crate::get_tag_from_thread_name()
-            .map(|tag| format!("{}::{}", $name, tag))
-            .unwrap_or_else(|| $name.to_owned())
-    }};
-}
+
 
 //region NormalScheduler
 pub struct NormalScheduler<N, C> {
@@ -90,8 +84,8 @@ impl<N, C> Clone for ControlScheduler<N, C> {
 }
 
 impl<N, C> FsmScheduler for ControlScheduler<N, C>
-    where N: Fsm {
-    type Fsm = N;
+    where C: Fsm {
+    type Fsm = C;
 
     fn schedule(&self, fsm: Box<Self::Fsm>) {
         let sender = match fsm.get_priority() {
@@ -99,9 +93,9 @@ impl<N, C> FsmScheduler for ControlScheduler<N, C>
             Priority::Low => &self.low_sender,
         };
 
-        match sender.send(FsmTypes::Normal(fsm)) {
+        match sender.send(FsmTypes::Control(fsm)) {
             Ok(()) => {}
-            Err(channel::SendError(FsmTypes::Normal(fsm))) => {}
+            Err(channel::SendError(FsmTypes::Control(fsm))) => {}
             _ => {}
         }
     }
@@ -198,7 +192,7 @@ impl<N: Fsm, C: Fsm> Batch<N, C> {
                 assert!(self.control.is_none());
                 self.control = Some(c);
             }
-            FsmTypes::Empty => false
+            FsmTypes::Empty => return false,
         }
         true
     }
@@ -462,7 +456,7 @@ impl<N, C> BatchSystem<N, C>
 
         for i in 0..self.pool_size{
             self.start_poller(
-                thd_name!(format!("{}-{}",name_prefix,i)),
+                crate::thd_name!(format!("{}-{}",name_prefix,i)),
                 Priority::Normal,
                 &mut builder
             );
@@ -470,7 +464,7 @@ impl<N, C> BatchSystem<N, C>
 
         for i in 0..self.low_priority_pool_size{
             self.start_poller(
-                thd_name!(format!("{}-low-{}",name_prefix,i)),
+                crate::thd_name!(format!("{}-low-{}",name_prefix,i)),
                 Priority::Low,
                 &mut builder
             );
@@ -532,6 +526,13 @@ pub fn create_system<N: Fsm, C: Fsm>(
     };
 
     let router=Router::new(control_box,normal_scheduler,control_scheduler,state_cnt);
+
+    // let normal_box =Arc::new(Mutex::new(NormalMailMap {
+    //     map: HashMap::default(),
+    //     alive_cnt: Arc::default(),
+    // }));
+    //
+    // let router=Router::new_normal(normal_box,control_box,normal_scheduler,control_scheduler,state_cnt);
 
     let system=BatchSystem{
         name_prefix:None,

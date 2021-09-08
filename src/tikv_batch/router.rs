@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::cell::Cell;
 use crate::tikv_batch::util::lru::LruCache;
 use crate::tikv_batch::util::Either;
-use std::sync::mpsc::{TrySendError, SendError};
+use crossbeam::channel::{SendError, TrySendError};
 use std::mem;
 
 /// A struct that traces the approximate memory usage of router.
@@ -57,7 +57,12 @@ pub struct Router<N: Fsm, C: Fsm, Ns, Cs> {
 }
 
 impl<N, C, Ns, Cs> Router<N, C, Ns, Cs>
-    where N: Fsm, C: Fsm, Ns: FsmScheduler<Fsm=N> + Clone, Cs: FsmScheduler<Fsm=C> + Clone {
+    where N: Fsm,
+          C: Fsm,
+          Ns: FsmScheduler<Fsm=N> + Clone,
+          Cs: FsmScheduler<Fsm=C> + Clone
+{
+
     pub(super) fn new(
         control_box: BasicMailbox<C>,
         normal_scheduler: Ns,

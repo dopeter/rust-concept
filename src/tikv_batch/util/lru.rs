@@ -70,7 +70,7 @@ impl<K> Trace<K> {
         unsafe {
             cut_out(record.as_mut());
 
-            ptr::drop_in_place(Box::from_raw(cur.as_ptr()).key.as_mut_ptr());
+            ptr::drop_in_place(Box::from_raw(record.as_ptr()).key.as_mut_ptr());
         }
     }
 
@@ -177,7 +177,7 @@ pub struct LruCache<K, V, T = CountTracker>
     where T: SizePolicy<K, V> {
     map: HashMap<K, ValueEntry<K, V>>,
     trace: Trace<K>,
-    capacity: uszie,
+    capacity: usize,
     size_policy: T,
 }
 
@@ -185,7 +185,7 @@ impl<K, V, T> LruCache<K, V, T>
     where T: SizePolicy<K, V> {
     pub fn with_capacity_sample_and_trace(
         mut capacity: usize,
-        sample_mask: uszie,
+        sample_mask: usize,
         size_policy: T,
     ) -> LruCache<K, V, T> {
         if capacity == 0 {
@@ -220,7 +220,7 @@ impl<K, V> LruCache<K, V>
         LruCache::with_capacity_and_sample(capacity, 0)
     }
 
-    pub fn with_capacity_and_sample(capacity: uszie, sample_mask: usize) -> LruCache<K, V> {
+    pub fn with_capacity_and_sample(capacity: usize, sample_mask: usize) -> LruCache<K, V> {
         LruCache::with_capacity_sample_and_trace(capacity, sample_mask, CountTracker::default())
     }
 
@@ -283,7 +283,7 @@ impl<K, V, T> LruCache<K, V, T>
         if let Some(v) = self.map.remove(key) {
             self.trace.delete(v.record);
             self.size_policy.on_remove(key, &v.value);
-            Some(v.value)
+            return Some(v.value);
         }
         None
     }
@@ -300,11 +300,11 @@ impl<K, V, T> LruCache<K, V, T>
     }
 
     #[inline]
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut K> {
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
         match self.map.get_mut(key) {
             Some(v) => {
                 self.trace.maybe_promote(v.record);
-                Some(&mut v.value)
+                return Some(&mut v.value);
             }
             None => None
         }
@@ -345,7 +345,7 @@ impl<'a,K,V> Iterator for Iter<'a,K,V>{
     }
 }
 
-#[cfg!(test)]
+
 mod tests{
 
     use super::*;

@@ -4,6 +4,7 @@ use crate::tikv_batch::mpsc::{Receiver, Sender, LooseBoundedSender, loose_bounde
 use crate::tikv_batch::mailbox::BasicMailbox;
 use std::borrow::Cow;
 use crate::tikv_batch::batch::{PollHandler, HandlerBuilder};
+use derive_more::{Add, AddAssign};
 
 
 //region Runner
@@ -14,7 +15,7 @@ pub struct Runner{
     pub sender:Option<Sender<()>>,
     /// Result of the calculation triggered by `Message::Loop`.
     /// Stores it inside `Runner` to avoid accidental optimization.
-    res:uszie,
+    res:usize,
     priority:Priority
 }
 
@@ -63,7 +64,7 @@ impl Runner{
 //endregion
 #[derive(Add, PartialEq, Debug, Default, AddAssign, Clone, Copy)]
 pub struct HandleMetrics{
-    pub begin:uszie,
+    pub begin:usize,
     pub control:usize,
     pub normal:usize
 }
@@ -110,9 +111,9 @@ impl PollHandler<Runner,Runner> for Handler{
     }
 
     fn end(&mut self, batch: &mut [Box<Runner>]) {
-        let mut c=-self.metrics.lock().unwrap();
+        let mut c=self.metrics.lock().unwrap();
         *c+=self.local;
-        self.local=HandleMetrics::default()
+        self.local=HandleMetrics::default();
     }
 }
 

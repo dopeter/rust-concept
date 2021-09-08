@@ -2,7 +2,9 @@ use crate::tikv_batch::fsm::{Fsm, FsmState, FsmScheduler};
 use std::sync::Arc;
 use crate::tikv_batch::mpsc::LooseBoundedSender;
 use std::sync::atomic::AtomicUsize;
-use std::sync::mpsc::{SendError, TrySendError};
+use crossbeam::channel::{
+    self, RecvError, RecvTimeoutError, SendError, TryRecvError, TrySendError,
+};
 use std::borrow::Cow;
 
 //region BasicMailbox
@@ -92,7 +94,7 @@ impl<Owner: Fsm> Clone for BasicMailbox<Owner> {
 pub struct Mailbox<Owner, Scheduler>
     where
         Owner: Fsm,
-        Scheduler: FsmSchduler<Fsm=Owner> {
+        Scheduler: FsmScheduler<Fsm=Owner> {
     mailbox: BasicMailbox<Owner>,
     scheduler: Scheduler,
 }

@@ -68,7 +68,7 @@ impl<N:Fsm> FsmState<N>{
         );
 
         if res.is_err(){
-            None
+            return None;
         }
 
         let p=self.data.swap(ptr::null_mut(),Ordering::AcqRel);
@@ -94,6 +94,7 @@ impl<N:Fsm> FsmState<N>{
         }
     }
 
+    #[inline]
     pub fn release(&self,fsm:Box<N>){
         let previous=self.data.swap(Box::into_raw(fsm),Ordering::AcqRel);
 
@@ -111,14 +112,14 @@ impl<N:Fsm> FsmState<N>{
                 Ok(_) => return,
                 Err(NOTIFY_STATE_DROP) =>{
                     let ptr=self.data.swap(ptr::null_mut(),Ordering::AcqRel);
-                    unsafe{Box::from_raw(ptr)}
+                    unsafe{Box::from_raw(ptr)};
                     return;
                 }
                 Err(s) => s,
-            }
+            };
         }
 
-        panic!("")
+        panic!("invalid release state : {:?} {}",previous,previous_status);
     }
 
     #[inline]
@@ -141,7 +142,7 @@ impl<N> Drop for FsmState<N>{
     fn drop(&mut self) {
         let ptr=self.data.swap(ptr::null_mut(),Ordering::SeqCst);
         if !ptr.is_null(){
-            unsafe {Box::from_raw(ptr)}
+            unsafe {Box::from_raw(ptr)};
         }
 
         self.state_cnt.fetch_sub(1,Ordering::Relaxed);

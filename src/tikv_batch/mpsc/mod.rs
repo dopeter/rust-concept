@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::sync::Arc;
 use crossbeam::channel;
-use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering, AtomicIsize};
 use crossbeam::channel::{
     RecvError, RecvTimeoutError, SendError, TryRecvError, TrySendError,
 };
@@ -86,7 +86,7 @@ pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
             sender,
             state: state.clone(),
         },
-        Receiver(receiver, state),
+        Receiver { receiver, state },
     )
 }
 
@@ -99,7 +99,7 @@ pub fn bounded<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
             sender,
             state: state.clone(),
         },
-        Receiver(receiver, state),
+        Receiver { receiver, state },
     )
 }
 
@@ -118,14 +118,14 @@ pub fn loose_bounded<T>(cap: usize) -> (LooseBoundedSender<T>, Receiver<T>) {
 
 //region State
 pub struct State {
-    sender_cnt: AtomicUsize,
+    sender_cnt: AtomicIsize,
     connected: AtomicBool,
 }
 
 impl State {
     fn new() -> State {
         State {
-            sender_cnt: AtomicUsize::new(1),
+            sender_cnt: AtomicIsize::new(1),
             connected: AtomicBool::new(true),
         }
     }
@@ -141,6 +141,27 @@ impl State {
 pub struct Sender<T> {
     sender: channel::Sender<T>,
     state: Arc<State>,
+}
+
+impl<T> Clone for Sender<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        self.state.sender_cnt.fetch_add(1, Ordering::AcqRel);
+        Sender {
+            sender: self.sender.clone(),
+            state: self.state.clone(),
+        }
+    }
+}
+
+impl<T> Drop for Sender<T> {
+    #[inline]
+    fn drop(&mut self) {
+        let res = self.state.sender_cnt.fetch_add(-1, Ordering::AcqRel);
+        if res == 1 {
+            self.close_sender();
+        }
+    }
 }
 
 impl<T> Sender<T> {
@@ -183,23 +204,7 @@ impl<T> Sender<T> {
     }
 }
 
-impl<T> Clone for Sender<T> {
-    fn clone(&self) -> Self {
-        self.state.sender_cnt.fetch_add(1, Ordering::AcqRel);
-        Sender {
-            sender: self.sender.clone(),
-            state: self.state.clone(),
-        }
-    }
-}
 
-impl<T> Drop for Sender<T> {
-    fn drop(&mut self) {
-        if self.state.sender_cnt.fetch_add(-1, Ordering::AcqRel) == 1 {
-            self.close_sender();
-        }
-    }
-}
 //endregion
 
 //region Receiver
@@ -241,7 +246,7 @@ impl<T> Receiver<T> {
 impl<T> Drop for Receiver<T> {
     #[inline]
     fn drop(&mut self) {
-        self.state.connected.store(flase, Ordering::Release);
+        self.state.connected.store(false, Ordering::Release);
     }
 }
 

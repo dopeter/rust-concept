@@ -4,7 +4,7 @@ use crate::tikv_batch::test_runner::{Message, Handler, Runner, Builder};
 use crate::tikv_batch::mpsc::unbounded;
 use crate::tikv_batch::batch::create_system;
 use crate::tikv_batch::config::Config;
-use std::sync::mpsc::{SendError, TrySendError, TryRecvError, RecvTimeoutError};
+use crossbeam::channel::{SendError, TrySendError,TryRecvError,RecvTimeoutError};
 use crate::tikv_batch::mailbox::BasicMailbox;
 use std::time::Duration;
 
@@ -54,7 +54,7 @@ fn test_basic() {
             runner.sender = Some(tx1);
 
             let mailbox = BasicMailbox::new(sender, runner, Arc::default());
-            router.register(1, mailbox);
+            router_.register(1, mailbox);
             tx.send(rx1).unwrap();
         }
     ))).unwrap();
