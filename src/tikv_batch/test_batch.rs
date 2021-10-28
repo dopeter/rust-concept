@@ -44,7 +44,7 @@ fn test_batch() {
     router.send(1,
     Message::Callback(Box::new(move |_:&Handler,_:&mut Runner|{
         tx.send(2).unwrap();
-    }))
+    })),
     ).unwrap();
 
     assert_eq!(rx.recv_timeout(Duration::from_secs(3)),Ok(2));
