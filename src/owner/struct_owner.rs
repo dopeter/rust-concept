@@ -45,7 +45,7 @@ pub fn test_struct_owner_of_ref(){
 
 
     println!("Original struct----------");
-    println!("{:#?}",owner_test_1);
+    // println!("{:#?}",owner_test_1);
 
 }
 
