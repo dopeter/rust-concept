@@ -11,3 +11,6 @@ Cargo.lock
 **/*.rs.bk
 
 /Idea/
+.idea/modules.xml
+.idea/rust-concept.iml
+.idea/vcs.xml
